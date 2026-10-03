@@ -58,7 +58,7 @@ def calculate_metrics(portfolio_results_file):
         # Calculate Sharpe ratio
         if 'rf' in data.columns:
             # Use risk-free rate if available
-            excess_returns = data['strategy'] - data['rf']
+            excess_returns = data['strategy']  # Already based on stock_exret.
             metrics["Sharpe Ratio"] = excess_returns.mean() / excess_returns.std() * np.sqrt(12)
         else:
             # Use zero as risk-free rate if not available
@@ -96,7 +96,7 @@ def calculate_metrics(portfolio_results_file):
         
         # Calculate drawdown
         data["cum_return"] = (1 + data['strategy']).cumprod()
-        data["running_max"] = data["cum_return"].cummax()
+        data["running_max"] = data["cum_return"].cummax().clip(lower=1.0)
         data["drawdown"] = 1 - data["cum_return"] / data["running_max"]
         metrics["Maximum Drawdown"] = data["drawdown"].max()
         
@@ -153,7 +153,7 @@ def main():
     """
     try:
         # Get work directory
-        work_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        work_dir = os.path.dirname(os.path.abspath(__file__))
         print(f"Working directory: {work_dir}")
         
         # Check for fast mode command line argument
@@ -166,6 +166,7 @@ def main():
             {"name": "long-only", "n_long": 50, "n_short": 0, "description": "Long-only with top 50 stocks"}
         ]
         
+        failures = []
         for strategy in strategies:
             print(f"\n{'='*80}")
             print(f"Running {strategy['description']}")
@@ -186,6 +187,7 @@ def main():
                 print(f"Completed {strategy['name']} strategy model run")
             except Exception as e:
                 print(f"Error running model: {str(e)}")
+                failures.append(strategy["name"])
                 continue
             
             # Calculate and display comprehensive metrics from saved results
@@ -201,10 +203,13 @@ def main():
             else:
                 print(f"Warning: Results file not found for {strategy['name']} strategy. Checked both with and without 'enhanced' in filename.")
     
+        if failures:
+            raise RuntimeError(f"Failed strategies: {failures}")
     except Exception as e:
         print(f"Error in main execution: {str(e)}")
         import traceback
         traceback.print_exc()
+        raise
 
 if __name__ == "__main__":
     main() 

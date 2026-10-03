@@ -14,11 +14,11 @@ if __name__ == "__main__":
     pd.set_option("mode.chained_assignment", None)
 
     # set working directory
-    work_dir = "Your working directory"
+    work_dir = os.path.dirname(os.path.abspath(__file__))
 
     # read sample data
     file_path = os.path.join(
-        work_dir, "sample_data.csv"
+        work_dir, "mma_sample_v2.csv"
     )  # replace with the correct file name
     raw = pd.read_csv(
         file_path, parse_dates=["date"], low_memory=False
@@ -57,8 +57,8 @@ if __name__ == "__main__":
                 print("Warning:", date, var, "set to zero.")
 
         # add the adjusted values
-        data = data._append(
-            group, ignore_index=True
+        data = pd.concat([data,
+            group], ignore_index=True
         )  # append may not work with certain versions of pandas, use concat instead if needed
 
     # initialize the starting date, counter, and output data
@@ -187,3 +187,4 @@ if __name__ == "__main__":
 
     # for timing purpose
     print(datetime.datetime.now())
+
