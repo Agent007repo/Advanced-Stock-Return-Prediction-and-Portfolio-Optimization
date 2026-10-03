@@ -1,3 +1,4 @@
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import statsmodels.formula.api as sm
@@ -5,7 +6,7 @@ from pandas.tseries.offsets import *
 
 
 # read predcited values
-pred_path = "Your predicted values path"
+pred_path = Path(__file__).resolve().parent / "stock_predictions.csv"
 pred = pd.read_csv(pred_path, parse_dates=["date"])
 # pred.columns = map(str.lower, pred.columns)
 
@@ -23,11 +24,11 @@ pred["rank"] = np.floor(
     / predicted.transform(lambda s: len(s) + 1)
 )  # rank stocks into deciles
 pred = pred.sort_values(["year", "month", "rank", "permno"])
-monthly_port = pred.groupby(["year", "month", "rank"]).apply(
-    lambda df: pd.Series(np.average(df["stock_exret"], axis=0))
-)  # calculate the realized return for each portfolio using realized stock returns
-monthly_port = monthly_port.unstack().dropna().reset_index()
+monthly_port = pred.groupby(["year", "month", "rank"])["stock_exret"].mean().unstack()
+monthly_port = monthly_port.reindex(columns=range(10)).dropna().reset_index()
 monthly_port.columns = ["year", "month"] + ["port_" + str(x) for x in range(1, 11)]
+if monthly_port.empty:
+    raise ValueError("No month has all ten deciles; supply a sufficiently broad stock universe.")
 monthly_port["port_11"] = (
     monthly_port["port_10"] - monthly_port["port_1"]
 )  # long-short portfolio
@@ -41,7 +42,7 @@ print("Sharpe Ratio:", sharpe)
 
 # Calculate the CAPM Alpha for the long-short Portfolio
 # you can use the same formula to calculate the Sharpe ratio for the long and short portfolios separately
-mkt_path = "Your market factor path"
+mkt_path = Path(__file__).resolve().parent / "mkt_ind.csv"
 mkt = pd.read_csv(mkt_path)
 monthly_port = monthly_port.merge(mkt, how="inner", on=["year", "month"])
 # Newy-West regression for heteroskedasticity and autocorrelation robust standard errors
@@ -65,15 +66,9 @@ print("Max 1-Month Loss:", max_1m_loss)
 
 # Calculate Drawdown of the long-short Portfolio
 # you can use the same formula to calculate the Sharpe ratio for the long and short portfolios separately
-monthly_port["log_port_11"] = np.log(
-    monthly_port["port_11"] + 1
-)  # calculate log returns
-monthly_port["cumsum_log_port_11"] = monthly_port["log_port_11"].cumsum(
-    axis=0
-)  # calculate cumulative log returns
-rolling_peak = monthly_port["cumsum_log_port_11"].cummax()
-drawdowns = rolling_peak - monthly_port["cumsum_log_port_11"]
-max_drawdown = drawdowns.max()
+wealth = (1 + monthly_port["port_11"]).cumprod()
+rolling_peak = wealth.cummax().clip(lower=1.0)
+max_drawdown = ((rolling_peak - wealth) / rolling_peak).max()
 print("Maximum Drawdown:", max_drawdown)
 
 
@@ -109,3 +104,4 @@ long_positions = pred[pred["rank"] == 9]
 short_positions = pred[pred["rank"] == 0]
 print("Long Portfolio Turnover:", turnover_count(long_positions))
 print("Short Portfolio Turnover:", turnover_count(short_positions))
+

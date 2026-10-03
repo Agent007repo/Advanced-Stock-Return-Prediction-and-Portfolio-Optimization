@@ -1,0 +1,17 @@
+
+
+# Local review/runtime artifacts and credentials
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+*.review.py
+best_ae.pt
+tokenizer_*.json
+logs/
+
+# Licensed source data is supplied locally
+mma_sample_v2.csv
